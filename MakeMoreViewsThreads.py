@@ -1,12 +1,17 @@
 # pip install selenium webdriver_manager
 
 import sys  # 3.12.7 | packaged by Anaconda, Inc. | (main, Oct  4 2024, 13:17:27) [MSC v.1929 64 bit (AMD64)]
+import threading
 import time
 import random
 # selenium 4
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
+
+
+# Hyper-Parameters
+thread_num = 6
 
 
 def parameters():
@@ -21,13 +26,17 @@ def parameters():
     # 使用无头浏览器模式, 完全隐藏图形界面和某些用户交互特征 (似乎非常有效？)
     options.add_argument('--headless')
 
+    # 每个线程需要访问的次数
     target_views = 100
+    # 目标网站
     target_paths = [
         "https://www.bilibili.com/video/BV1JaqLBTEn9/?vd_source=c2ec0da465c37503711a8d961f034580", \
         "https://www.bilibili.com/video/BV17841147Lg/?spm_id_from=333.1387.upload.video_card.click&vd_source=c2ec0da465c37503711a8d961f034580", \
         # "https://cn.bing.com/", \
     ]
+    # 基础等待时间
     basic_time = 5
+    # 浮动等待间隔
     floating_time = [
         5,
         5
@@ -35,6 +44,16 @@ def parameters():
 
     assert len(target_paths) <= len(floating_time) # 对应关系
     return (options, target_views, target_paths, basic_time, floating_time)
+
+
+class myThread(threading.Thread):
+    def __init__(self, id, configs):
+        threading.Thread.__init__(self)
+        self.id = id
+        self.configs = configs
+
+    def run(self):
+        chrome(self.id, *self.configs)
 
 
 def chrome(thread_id, chrome_options, views, paths, basic_time, floating_time):
@@ -68,4 +87,13 @@ if __name__ == "__main__":
     # 官方 ERROR 文档：https://www.selenium.dev/documentation/webdriver/troubleshooting/errors/driver_location/
     # 自动化解决方案 Webdriver Manager：https://github.com/SergeyPirogov/webdriver_manager
     # Salty Fish 大佬的帖子 https://im.salty.fish/index.php/archives/revengr-bilibili-352.html 研究 B 站风控底层机制
-    chrome(0, *parameters())
+    # chrome(0, *parameters())
+
+    threads = []
+    # create
+    for i in range(thread_num):
+        threads.append(myThread(i, parameters()))
+    # start
+    for i in range(thread_num):
+        threads[i].start()
+    print("\n\n----- START -----\n\n")
