@@ -11,7 +11,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 
 # Hyper-Parameters
-thread_num = 6
+thread_num = 4
 
 
 def parameters():
@@ -27,7 +27,7 @@ def parameters():
     options.add_argument('--headless')
 
     # 每个线程需要访问的次数
-    target_views = 100
+    target_views = 200
     # 目标网站
     target_paths = [
         "https://www.bilibili.com/video/BV1JaqLBTEn9/?vd_source=c2ec0da465c37503711a8d961f034580", \
@@ -42,7 +42,7 @@ def parameters():
         5
     ]
 
-    assert len(target_paths) <= len(floating_time) # 对应关系
+    assert len(target_paths) == len(floating_time) # 对应关系
     return (options, target_views, target_paths, basic_time, floating_time)
 
 

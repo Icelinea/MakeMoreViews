@@ -33,7 +33,7 @@ def parameters():
         5
     ]
 
-    assert len(target_paths) <= len(floating_time) # 对应关系
+    assert len(target_paths) == len(floating_time) # 对应关系
     return (options, target_views, target_paths, basic_time, floating_time)
 
 
