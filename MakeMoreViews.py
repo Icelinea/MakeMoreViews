@@ -60,7 +60,9 @@ def chrome(thread_id, chrome_options, views, paths, basic_time, floating_time):
                 time.sleep(ctime)
                 browserl.quit()
             except Exception as e:
+                print('\n\n----------THREAD-{} exit due to'.format(thread_id))
                 print(e)
+                exit(0)
 
 
 if __name__ == "__main__":
