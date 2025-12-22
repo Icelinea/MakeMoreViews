@@ -10,8 +10,9 @@ from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 
 
+# 目前只能做到大概 1/4 - 1/3 的请求不被拦截
 # Hyper-Parameters
-thread_num = 4
+thread_num = 8
 
 
 def parameters():
@@ -31,15 +32,16 @@ def parameters():
     # 目标网站
     target_paths = [
         "https://www.bilibili.com/video/BV1JaqLBTEn9/?vd_source=c2ec0da465c37503711a8d961f034580", \
-        "https://www.bilibili.com/video/BV17841147Lg/?spm_id_from=333.1387.upload.video_card.click&vd_source=c2ec0da465c37503711a8d961f034580", \
+        # "https://www.bilibili.com/video/BV17841147Lg/?spm_id_from=333.1387.upload.video_card.click&vd_source=c2ec0da465c37503711a8d961f034580", \
         # "https://cn.bing.com/", \
     ]
     # 基础等待时间
-    basic_time = 5
+    basic_time = 3
     # 浮动等待间隔
     floating_time = [
-        5,
-        5
+        30,
+        # 5,
+        # 5
     ]
 
     assert len(target_paths) == len(floating_time) # 对应关系
