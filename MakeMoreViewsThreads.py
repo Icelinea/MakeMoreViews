@@ -12,7 +12,9 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 # 目前只能做到大概 1/4 - 1/3 的请求不被拦截
 # Hyper-Parameters
+exit_event = threading.Event()
 thread_num = 8
+debug_mode = False
 
 
 def parameters():
@@ -31,16 +33,16 @@ def parameters():
     target_views = 200
     # 目标网站
     target_paths = [
-        "https://www.bilibili.com/video/BV1JaqLBTEn9/?vd_source=c2ec0da465c37503711a8d961f034580", \
-        # "https://www.bilibili.com/video/BV17841147Lg/?spm_id_from=333.1387.upload.video_card.click&vd_source=c2ec0da465c37503711a8d961f034580", \
+        "https://www.bilibili.com/video/BV1kGvbB6ERD/?vd_source=c2ec0da465c37503711a8d961f034580", \
+        # "https://www.bilibili.com/video/BV1JaqLBTEn9/?vd_source=c2ec0da465c37503711a8d961f034580", \
         # "https://cn.bing.com/", \
     ]
     # 基础等待时间
-    basic_time = 3
+    basic_time = 5
     # 浮动等待间隔
     floating_time = [
-        30,
-        # 5,
+        10,
+        # 10,
         # 5
     ]
 
@@ -60,31 +62,43 @@ class myThread(threading.Thread):
 
 def chrome(thread_id, chrome_options, views, paths, basic_time, floating_time):
     # 如果出现"找不到 host"的异常，有可能是 Chrome 正在更新导致的
-    for i in range(views):
-        for j in range(len(paths)):
-            try:
-                browserl = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
-                # 调整浏览器窗口大小和位置 - 潜在识别点
-                length = random.randint(1280, 1920)
-                width = random.randint(720, 1080)
-                x = random.randint(-400, 400)
-                y = random.randint(-200, 200)
-                browserl.set_window_size(length, width)
-                browserl.set_window_position(x, y)
+    browserl = None
 
-                browserl.get(paths[j])
-                ctime = random.randint(basic_time, basic_time + floating_time[j])
+    try:
+        for i in range(views):
+            for j in range(len(paths)):
+                # 检查退出标志
+                if exit_event.is_set():
+                    print("Thread-{} exit due to system call.".format(thread_id))
+                    return
 
-                print('\n[THREAD-{}] [ROUND-{}] Waiting time: {} s\nWindow pixels: {}*{} || Windows position: {},{}\nCurrent Web path: {}'.\
-                      format(thread_id, i, ctime, length, width, x, y, paths[j]))
-                
-                time.sleep(ctime)
-                browserl.quit()
-            except Exception as e:
-                print('\n\n----------THREAD-{} exit due to'.format(thread_id))
-                print(e)
-                exit(0)
+                try:
+                    browserl = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
+                    # 调整浏览器窗口大小和位置 - 潜在识别点
+                    length = random.randint(1280, 1920)
+                    width = random.randint(720, 1080)
+                    x = random.randint(-400, 400)
+                    y = random.randint(-200, 200)
+                    browserl.set_window_size(length, width)
+                    browserl.set_window_position(x, y)
 
+                    browserl.get(paths[j])  # (?) 添加默认关闭浏览器声音功能
+                    ctime = random.randint(basic_time, basic_time + floating_time[j])
+
+                    if debug_mode:
+                        print('[THREAD-{}] [ROUND-{}] Waiting time: {} s\nWindow pixels: {}*{} || Windows position: {},{}\nCurrent Web path: {}'.format(thread_id, i, ctime, length, width, x, y, paths[j]))
+                    
+                    time.sleep(ctime)   # (?) 可以考虑分段睡眠 + 检查退出标志
+                except Exception as e:
+                    print("[THREAD-{}] [Exception] {}".format(thread_id, e))
+                finally:
+                    if browserl:
+                        browserl.quit()
+                    browserl = None # 显式重置
+    finally:
+        if browserl:
+            browserl.quit()
+        browserl = None
 
 if __name__ == "__main__":
     # 首次启动前若 selenium 版本不大于 4.6，则需要自己安装对应浏览器的 driver
@@ -101,3 +115,15 @@ if __name__ == "__main__":
     for i in range(thread_num):
         threads[i].start()
     print("\n\n----- START -----\n\n")
+    try:
+        while any(t.is_alive() for t in threads):
+            for t in threads:
+                t.join(timeout=0.1)
+    except:
+        print("\n\n----- Closing all sub-threads -----\n\n")
+        exit_event.set()
+    finally:
+        for t in threads:
+            if t.is_alive():
+                t.join()
+        print("\n\n----- Program Safely Exit ------\n\n")
