@@ -14,7 +14,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 # Hyper-Parameters
 exit_event = threading.Event()
 thread_num = 8
-debug_mode = False
+debug_mode = True
 
 
 def parameters():
@@ -33,7 +33,7 @@ def parameters():
     target_views = 200
     # 目标网站
     target_paths = [
-        "https://www.bilibili.com/video/BV1kGvbB6ERD/?vd_source=c2ec0da465c37503711a8d961f034580", \
+        "https://www.bilibili.com/video/BV1NJZRB3EpC?vd_source=c2ec0da465c37503711a8d961f034580&spm_id_from=333.788.player.switch", \
         # "https://www.bilibili.com/video/BV1JaqLBTEn9/?vd_source=c2ec0da465c37503711a8d961f034580", \
         # "https://cn.bing.com/", \
     ]
@@ -41,7 +41,7 @@ def parameters():
     basic_time = 5
     # 浮动等待间隔
     floating_time = [
-        10,
+        25,
         # 10,
         # 5
     ]
@@ -88,7 +88,10 @@ def chrome(thread_id, chrome_options, views, paths, basic_time, floating_time):
                     if debug_mode:
                         print('[THREAD-{}] [ROUND-{}] Waiting time: {} s\nWindow pixels: {}*{} || Windows position: {},{}\nCurrent Web path: {}'.format(thread_id, i, ctime, length, width, x, y, paths[j]))
                     
-                    time.sleep(ctime)   # (?) 可以考虑分段睡眠 + 检查退出标志
+                    # 分段睡眠 + 检查退出标志
+                    for _ in range(ctime):
+                        if exit_event.is_set(): break
+                        time.sleep(1)
                 except Exception as e:
                     print("[THREAD-{}] [Exception] {}".format(thread_id, e))
                 finally:
