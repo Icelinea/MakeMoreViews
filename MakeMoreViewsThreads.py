@@ -10,14 +10,18 @@ from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 
 
-# 目前只能做到大概 1/4 - 1/3 的请求不被拦截
 # Hyper-Parameters
 exit_event = threading.Event()
-thread_num = 8
+thread_num = 1
 debug_mode = True
 
 
-def parameters():
+def parameters(mode="PC"):
+    """
+    mode: PC, Android, iOS
+    """
+    assert mode in ["PC", "Android", "iOS"], "Invaild Access Mode"
+
     # 如何隐藏 selenium 请求 https://developer.baidu.com/article/detail.html?id=3348317
     options = webdriver.ChromeOptions()
     # chrome 无痕模式
@@ -25,29 +29,45 @@ def parameters():
     # 修改 User-Agent 字符串
     # Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/118.0
     # Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36
-    options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36')
+    if mode == "PC":
+        options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36')
+    elif mode == "Android":
+        options.add_argument('user-agent=Mozilla/5.0 (Linux; Android 13; SM-S901B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36 BiliApp/7.20.0')
+    elif mode == "iOS":
+        options.add_argument('user-agent=Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 BiliApp/7.20.0')
+    else:
+        assert False
     # 使用无头浏览器模式, 完全隐藏图形界面和某些用户交互特征 (似乎非常有效？)
     options.add_argument('--headless')
+    # 禁用 Chrome 效能/休眠模式
+    options.add_argument('--disable-background-networking')
+    options.add_argument('--disable-background-timer-throttling')
+    options.add_argument('--disable-backgrounding-occluded-windows')
+    options.add_argument('--disable-breakpad')
+    options.add_argument('--disable-client-side-phishing-detection')
+    options.add_argument('--disable-component-update')
+    options.add_argument('--disable-default-apps')
+    options.add_argument('--disable-dev-shm-usage') # 防止内存溢出
+    options.add_argument('--no-sandbox')
 
     # 每个线程需要访问的次数
-    target_views = 200
+    target_views = 1000
     # 目标网站
     target_paths = [
-        "https://www.bilibili.com/video/BV1NJZRB3EpC?vd_source=c2ec0da465c37503711a8d961f034580&spm_id_from=333.788.player.switch", \
-        # "https://www.bilibili.com/video/BV1JaqLBTEn9/?vd_source=c2ec0da465c37503711a8d961f034580", \
-        # "https://cn.bing.com/", \
+        "https://www.bilibili.com/video/BV1U3Q4BnEWT/?spm_id_from=333.1007.top_bar.click", \
+        "https://www.bilibili.com/video/BV1ZVQzBqEth/?spm_id_from=333.337.search-card.all.click", \
     ]
     # 基础等待时间
     basic_time = 5
     # 浮动等待间隔
     floating_time = [
-        25,
-        # 10,
+        5,
+        5,
         # 5
     ]
 
     assert len(target_paths) == len(floating_time) # 对应关系
-    return (options, target_views, target_paths, basic_time, floating_time)
+    return (options, mode, target_views, target_paths, basic_time, floating_time)
 
 
 class myThread(threading.Thread):
@@ -60,7 +80,7 @@ class myThread(threading.Thread):
         chrome(self.id, *self.configs)
 
 
-def chrome(thread_id, chrome_options, views, paths, basic_time, floating_time):
+def chrome(thread_id, chrome_options, current_mode, views, paths, basic_time, floating_time):
     # 如果出现"找不到 host"的异常，有可能是 Chrome 正在更新导致的
     browserl = None
 
@@ -75,19 +95,27 @@ def chrome(thread_id, chrome_options, views, paths, basic_time, floating_time):
                 try:
                     browserl = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
                     # 调整浏览器窗口大小和位置 - 潜在识别点
-                    length = random.randint(1280, 1920)
-                    width = random.randint(720, 1080)
-                    x = random.randint(-400, 400)
-                    y = random.randint(-200, 200)
-                    browserl.set_window_size(length, width)
-                    browserl.set_window_position(x, y)
+                    if current_mode == "PC":
+                        length = random.randint(1280, 1920)
+                        width = random.randint(720, 1080)
+                        x = random.randint(-400, 400)
+                        y = random.randint(-200, 200)
+                        browserl.set_window_size(length, width)
+                        browserl.set_window_position(x, y)
 
                     browserl.get(paths[j])  # (?) 添加默认关闭浏览器声音功能
                     ctime = random.randint(basic_time, basic_time + floating_time[j])
 
                     if debug_mode:
-                        print('[THREAD-{}] [ROUND-{}] Waiting time: {} s\nWindow pixels: {}*{} || Windows position: {},{}\nCurrent Web path: {}'.format(thread_id, i, ctime, length, width, x, y, paths[j]))
-                    
+                        if current_mode == "PC":
+                            print('[{}]\t[THREAD-{}] [ROUND-{}] Waiting time: {} s\nWindow pixels: {}*{} || Windows position: {},{}\nCurrent Web path: {}'.format(current_mode, thread_id, i, ctime, length, width, x, y, paths[j]))
+                        elif current_mode == "Android":
+                            print('[{}]\t[THREAD-{}] [ROUND-{}] Waiting time: {} s\nCurrent Web path: {}'.format(current_mode, thread_id, i, ctime, paths[j]))
+                        elif current_mode == "iOS":
+                            print('[{}]\t[THREAD-{}] [ROUND-{}] Waiting time: {} s\nCurrent Web path: {}'.format(current_mode, thread_id, i, ctime, paths[j]))
+                        else:
+                            assert False
+                        
                     # 分段睡眠 + 检查退出标志
                     for _ in range(ctime):
                         if exit_event.is_set(): break
@@ -113,7 +141,12 @@ if __name__ == "__main__":
     threads = []
     # create
     for i in range(thread_num):
-        threads.append(myThread(i, parameters()))
+        if thread_num - 2 > 0 and i == thread_num - 2:
+            threads.append(myThread(i, parameters("iOS")))
+        elif thread_num - 1 > 0 and i == thread_num - 1:
+            threads.append(myThread(i, parameters("Android")))
+        else:
+            threads.append(myThread(i, parameters("PC")))
     # start
     for i in range(thread_num):
         threads[i].start()
