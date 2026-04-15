@@ -1,6 +1,6 @@
 # pip install selenium webdriver_manager
 
-import sys  # 3.12.7 | packaged by Anaconda, Inc. | (main, Oct  4 2024, 13:17:27) [MSC v.1929 64 bit (AMD64)]
+import os, sys  # 3.12.7 | packaged by Anaconda, Inc. | (main, Oct  4 2024, 13:17:27) [MSC v.1929 64 bit (AMD64)]
 import threading
 import time
 import random
@@ -16,6 +16,12 @@ import redis
 exit_event = threading.Event()
 thread_num = 1
 debug_mode = True
+
+
+def kill_leftover_processes():
+    # 强制结束所有残留的驱动和浏览器进程
+    os.system("taskkill /f /im chromedriver.exe /t")
+    os.system("taskkill /f /im chrome.exe /t")
 
 
 def proxy_pool():
@@ -52,7 +58,7 @@ def parameters(mode="PC"):
     options = webdriver.ChromeOptions()
 
     # 动态 IP 池
-    options.add_argument(f'--proxy-server={proxy_pool()}')
+    # options.add_argument(f'--proxy-server={proxy_pool()}')
 
     # chrome 无痕模式
     options.add_argument('--incognito')
@@ -74,22 +80,26 @@ def parameters(mode="PC"):
     else:
         assert False
 
-    # 使用无头浏览器模式, 完全隐藏图形界面和某些用户交互特征 (似乎非常有效？)
+    # 使用无头浏览器模式, 完全隐藏图形界面和某些用户交互特征
     options.add_argument('--headless')
 
     # 禁用 Chrome 效能/休眠模式
-    options.add_argument('--disable-background-networking')
     options.add_argument('--disable-background-timer-throttling')
     options.add_argument('--disable-backgrounding-occluded-windows')
     options.add_argument('--disable-breakpad')
-    options.add_argument('--disable-client-side-phishing-detection')
-    options.add_argument('--disable-component-update')
     options.add_argument('--disable-default-apps')
     options.add_argument('--disable-dev-shm-usage') # 防止内存溢出
     options.add_argument('--no-sandbox')
+    # 禁用 Windows 效能模式特征 (EcoQoS)
+    options.add_argument("--disable-features=UseEcoQoSForBackgroundProcess")
+    # 禁用自动更新检查
+    options.add_argument("--disable-component-update")
+    # 禁用后台扩展和通知，减少残留可能性
+    options.add_argument("--disable-background-networking")
+    options.add_argument("--disable-client-side-phishing-detection")
 
     # 每个线程需要访问的次数
-    target_views = 1000
+    target_views = 1800
     # 目标网站
     target_paths = [
         "https://www.bilibili.com/video/BV1U3Q4BnEWT/?spm_id_from=333.1007.top_bar.click", \
@@ -173,10 +183,12 @@ def chrome(thread_id, chrome_options, current_mode, views, paths, basic_time, fl
                     print("[THREAD-{}] [Exception] {}".format(thread_id, e))
                 finally:
                     if browserl:
+                        browserl.close()    # 先关闭再消除
                         browserl.quit()
                     browserl = None # 显式重置
     finally:
         if browserl:
+            browserl.close()
             browserl.quit()
         browserl = None
 
@@ -200,10 +212,16 @@ if __name__ == "__main__":
     for i in range(thread_num):
         threads[i].start()
     print("\n\n----- START -----\n\n")
+    # countdown = 0
     try:
         while any(t.is_alive() for t in threads):
             for t in threads:
                 t.join(timeout=0.1)
+                
+            # countdown += 1
+            # if countdown >= 600:
+            #     countdown = 0
+            #     kill_leftover_processes()
     except:
         print("\n\n----- Closing all sub-threads -----\n\n")
         exit_event.set()
